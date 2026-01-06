@@ -8,6 +8,7 @@
 import UIKit
 import HaishinKit
 import AVFoundation
+import VideoToolbox
 
 class RTMPView: UIView {
   private var hkView: MTHKView!
@@ -34,6 +35,24 @@ class RTMPView: UIView {
   @objc var enableAudio: Bool = true {
     didSet {
       updateAudioAttachment()
+    }
+  }
+
+  @objc var videoSettings: NSDictionary = NSDictionary(
+      dictionary: [
+        "width": 720,
+        "height": 1280,
+        "bitrate": 3000 * 1000,
+        "audioBitrate": 128 * 1000
+      ]
+  ){
+    didSet {
+        let width = videoSettings["width"] as? Int ?? 720
+        let height = videoSettings["height"] as? Int ?? 1280
+        let bitrate = videoSettings["bitrate"] as? Int ?? (3000 * 1000)
+        let audioBitrate = videoSettings["audioBitrate"] as? Int ?? (128 * 1000)
+
+        RTMPCreator.setVideoSettings(VideoSettingsType(width: width, height: height, bitrate: bitrate, audioBitrate: audioBitrate))
     }
   }
 
@@ -98,12 +117,16 @@ class RTMPView: UIView {
         .continuousExposure: true
     ]
 
+    RTMPCreator.stream.audioSettings = [
+        .bitrate: RTMPCreator.videoSettings.audioBitrate
+    ]
+
     RTMPCreator.stream.videoSettings = [
-        .width: 720,
-        .height: 1280,
-        .bitrate: 3000 * 1024,
-        .scalingMode: ScalingMode.cropSourceToCleanAperture
-        
+        .width: RTMPCreator.videoSettings.width,
+        .height: RTMPCreator.videoSettings.height,
+        .bitrate: RTMPCreator.videoSettings.bitrate,
+        .scalingMode: ScalingMode.cropSourceToCleanAperture,
+        .profileLevel: kVTProfileLevel_H264_High_AutoLevel
     ]
 
     updateAudioAttachment()
@@ -151,6 +174,7 @@ class RTMPView: UIView {
          if onDisconnect != nil {
               onDisconnect!(nil)
             }
+           changeStreamState(status: "CLOSED")
            break
          
        case RTMPStream.Code.publishStart.rawValue:

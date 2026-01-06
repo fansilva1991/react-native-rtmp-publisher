@@ -141,27 +141,34 @@ async function publisherActions() {
   await publisherRef.current.isVideoPrepared();
   await publisherRef.current.isCameraOnPreview();
   await publisherRef.current.setAudioInput(audioInput: AudioInputType);
+  await publisherRef.current.setVideoSettings({ width: 1280, height: 720, bitrate: 2500000 });
 }
 
 <RTMPPublisher
   ref={publisherRef}
   streamURL="rtmp://your-publish-url"
   streamName="stream-name"
-  onConnectionFailedRtmp={() => ...}
-  onConnectionStartedRtmp={() => ...}
-  onConnectionSuccessRtmp={() => ...}
-  onDisconnectRtmp={() => ...}
-  onNewBitrateRtmp={() => ...}
-  onStreamStateChanged={(status: streamState) => ...}
+  videoSettings={{ width: 720, height: 1280, bitrate: 3000000 }}
+  onConnectionFailed={() => ...}
+  onConnectionStarted={() => ...}
+  onConnectionSuccess={() => ...}
+  onDisconnect={() => ...}
+  onNewBitrateReceived={() => ...}
+  onStreamStateChanged={(status: StreamState) => {
+    if (status === 'CLOSED') {
+      // Handle stream closed
+    }
+  }}
 />
 ```
 
 ## Props
 
-|     Name     |   Type   | Required |              Description              |
-| :----------: | :------: | :------: | :-----------------------------------: |
-| `streamURL`  | `string` |  `true`  | Publish URL address with RTM Protocol |
-| `streamName` | `string` |  `true`  |          Stream name or key           |
+|       Name        |        Type         | Required |                    Description                     | Android | iOS |
+| :---------------: | :-----------------: | :------: | :------------------------------------------------: | :-----: | :-: |
+|    `streamURL`    |      `string`       |  `true`  |       Publish URL address with RTMP Protocol       |   ✅    | ✅  |
+|   `streamName`    |      `string`       |  `true`  |                Stream name or key                  |   ✅    | ✅  |
+|  `videoSettings`  | `VideoSettingsType` | `false`  | Video settings (resolution, bitrate) for the stream |   ❌    | ✅  |
 
 ### Youtube Example
 
@@ -193,32 +200,38 @@ For live stream, Youtube gives you stream url and stream key, you can place the 
 
 ## Methods
 
-|        Name         |          Returns          |         Description         |   Android | iOS |
-| :-----------------: | :------------------------:| :-------------------------: |  :------: |:---:|
-|    `startStream`    |       `Promise<void>`     |      Starts the stream      |     ✅    |  ✅ |
-|    `stopStream`     |       `Promise<void>`     |      Stops the stream       |     ✅    |  ✅ |
-|       `mute`        |       `Promise<void>`     |    Mutes the microphone     |     ✅    |  ✅ |
-|      `unmute`       |       `Promise<void>`     |   Unmutes the microphone    |     ✅    |  ✅ |
-|   `switchCamera`    |       `Promise<void>`     |     Switches the camera     |     ✅    |  ✅ |
-|   `toggleFlash`     |       `Promise<void>`     |    Toggles the flash        |     ✅    |  ✅ |
-|   `getPublishURL`   |      `Promise<string>`    |    Gets the publish URL     |     ✅    |  ✅ |
-|      `isMuted`      |      `Promise<boolean>`   |  Returns microphone state   |     ✅    |  ✅ |
-|    `isStreaming`    |      `Promise<boolean>`   |   Returns streaming state   |     ✅    |  ✅ |
-|   `hasCongestion`   |      `Promise<boolean>`   |    Returns if congestion    |     ✅    |  ❌ |
-|  `isAudioPrepared`  |      `Promise<boolean>`   | Returns audio prepare state |     ✅    |  ✅ |
-|  `isVideoPrepared`  |      `Promise<boolean>`   | Returns video prepare state |     ✅    |  ✅ |
-| `isCameraOnPreview` |      `Promise<boolean>`   |    Returns camera is on     |     ✅    |  ❌ |
-|   `setAudioInput`   |  `Promise<AudioInputType>`|    Sets microphone input    |     ✅    |  ✅ |
+|        Name         |          Returns          |              Description               | Android | iOS |
+| :-----------------: | :-----------------------: | :------------------------------------: | :-----: | :-: |
+|    `startStream`    |     `Promise<void>`       |          Starts the stream             |   ✅    | ✅  |
+|    `stopStream`     |     `Promise<void>`       |           Stops the stream             |   ✅    | ✅  |
+|       `mute`        |     `Promise<void>`       |        Mutes the microphone            |   ✅    | ✅  |
+|      `unmute`       |     `Promise<void>`       |       Unmutes the microphone           |   ✅    | ✅  |
+|   `switchCamera`    |     `Promise<void>`       |         Switches the camera            |   ✅    | ✅  |
+|   `toggleFlash`     |     `Promise<void>`       |         Toggles the flash              |   ✅    | ✅  |
+|   `getPublishURL`   |    `Promise<string>`      |        Gets the publish URL            |   ✅    | ✅  |
+|      `isMuted`      |    `Promise<boolean>`     |      Returns microphone state          |   ✅    | ✅  |
+|    `isStreaming`    |    `Promise<boolean>`     |       Returns streaming state          |   ✅    | ✅  |
+|   `hasCongestion`   |    `Promise<boolean>`     |        Returns if congestion           |   ✅    | ❌  |
+|  `isAudioPrepared`  |    `Promise<boolean>`     |     Returns audio prepare state        |   ✅    | ✅  |
+|  `isVideoPrepared`  |    `Promise<boolean>`     |     Returns video prepare state        |   ✅    | ✅  |
+| `isCameraOnPreview` |    `Promise<boolean>`     |        Returns camera is on            |   ✅    | ❌  |
+|   `setAudioInput`   |     `Promise<void>`       |        Sets microphone input           |   ✅    | ✅  |
+| `setVideoSettings`  |     `Promise<void>`       | Sets video resolution and bitrate      |   ❌    | ✅  |
 
 ## Types
 
-| Name                      |                      Value                          |
-| ------------------------- | :--------------------------------------------------:|
-| `streamState`             | `CONNECTING`, `CONNECTED`, `DISCONNECTED`, `FAILED` |
-| `BluetoothDeviceStatuses` | `CONNECTING`, `CONNECTED`, `DISCONNECTED`           |
-| `AudioInputType`          | `BLUETOOTH_HEADSET`, `SPEAKER`, `WIRED_HEADSET`     |
+| Name                      |                         Value                                 |
+| ------------------------- | :-----------------------------------------------------------: |
+| `StreamState`             | `CONNECTING`, `CONNECTED`, `DISCONNECTED`, `CLOSED`, `FAILED` |
+| `BluetoothDeviceStatuses` | `CONNECTING`, `CONNECTED`, `DISCONNECTED`                     |
+| `AudioInputType`          | `BLUETOOTH_HEADSET`, `SPEAKER`, `WIRED_HEADSET`               |
+| `VideoSettingsType`       | `{ width: number, height: number, bitrate: number, audioBitrate?: number }` |
 
-* AudioInputType: WIRED_HEADSET type supporting in only iOS. On Android it affects nothing. If a wired headset connected to Android device, device uses it as default.
+### Notes
+* `AudioInputType`: `WIRED_HEADSET` type is only supported on iOS. On Android it has no effect. If a wired headset is connected to an Android device, the device uses it as default.
+* `VideoSettingsType`: The `audioBitrate` property is optional and defaults to 128000 (128 kbps) if not provided. This type is only supported on iOS.
+* `StreamState.CLOSED`: The `CLOSED` state is emitted when the RTMP connection is closed. This is useful for detecting when the stream has ended and taking appropriate action.
+
 ## Used Native Packages
 
 - Android: [rtmp-rtsp-stream-client-java](https://github.com/pedroSG94/rtmp-rtsp-stream-client-java) [2.2.2]

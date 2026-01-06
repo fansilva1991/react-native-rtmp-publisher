@@ -3,7 +3,11 @@ import {
   requireNativeComponent,
   ViewStyle,
 } from 'react-native';
-import type { StreamState, BluetoothDeviceStatuses } from './types';
+import type {
+  StreamState,
+  BluetoothDeviceStatuses,
+  VideoSettingsType,
+} from './types';
 
 type RTMPData<T> = { data: T };
 
@@ -23,6 +27,7 @@ export interface NativeRTMPPublisherProps {
   streamURL: string;
   streamName: string;
   enableAudio?: boolean;
+  videoSettings?: VideoSettingsType;
   onConnectionFailed?: (e: ConnectionFailedType) => void;
   onConnectionStarted?: (e: ConnectionStartedType) => void;
   onConnectionSuccess?: (e: ConnectionSuccessType) => void;

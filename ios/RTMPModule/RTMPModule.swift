@@ -75,4 +75,18 @@ class RTMPModule: NSObject {
     func setAudioInput(_ audioInput: (NSInteger), resolve: (RCTPromiseResolveBlock), reject: (RCTPromiseRejectBlock)){
         resolve(RTMPCreator.setAudioInput(audioInput: audioInput))
     }
+
+    @objc
+    func setVideoSettings(_ videoSettingsDict: NSDictionary, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        guard let width = videoSettingsDict["width"] as? Int,
+              let height = videoSettingsDict["height"] as? Int,
+              let bitrate = videoSettingsDict["bitrate"] as? Int else {
+            reject("INVALID_ARGUMENTS", "Invalid video settings", nil)
+            return
+        }
+        let audioBitrate = videoSettingsDict["audioBitrate"] as? Int ?? 128000
+        let videoSettings = VideoSettingsType(width: width, height: height, bitrate: bitrate, audioBitrate: audioBitrate)
+
+        resolve(RTMPCreator.setVideoSettings(videoSettings))
+    }
 }
