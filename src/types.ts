@@ -108,3 +108,5 @@ export interface VideoSettingsType {
   bitrate: number;
   audioBitrate?: number;
 }
+
+export type VideoOrientation = 'portrait' | 'landscape';

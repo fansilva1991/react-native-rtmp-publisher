@@ -15,6 +15,7 @@ import type {
   BluetoothDeviceStatuses,
   AudioInputType,
   VideoSettingsType,
+  VideoOrientation,
 } from './types';
 
 const RTMPModule = NativeModules.RTMPPublisher;
@@ -27,6 +28,11 @@ export interface RTMPPublisherProps {
    * Video settings for the stream (resolution, bitrate)
    */
   videoSettings?: VideoSettingsType;
+  /**
+   * Video orientation for the stream output
+   * @default 'portrait'
+   */
+  videoOrientation?: VideoOrientation;
   /**
    * Callback for connection fails on RTMP server
    */

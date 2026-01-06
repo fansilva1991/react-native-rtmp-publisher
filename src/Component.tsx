@@ -7,6 +7,7 @@ import type {
   StreamState,
   BluetoothDeviceStatuses,
   VideoSettingsType,
+  VideoOrientation,
 } from './types';
 
 type RTMPData<T> = { data: T };
@@ -28,6 +29,7 @@ export interface NativeRTMPPublisherProps {
   streamName: string;
   enableAudio?: boolean;
   videoSettings?: VideoSettingsType;
+  videoOrientation?: VideoOrientation;
   onConnectionFailed?: (e: ConnectionFailedType) => void;
   onConnectionStarted?: (e: ConnectionStartedType) => void;
   onConnectionSuccess?: (e: ConnectionSuccessType) => void;

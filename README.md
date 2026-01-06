@@ -149,6 +149,7 @@ async function publisherActions() {
   streamURL="rtmp://your-publish-url"
   streamName="stream-name"
   videoSettings={{ width: 720, height: 1280, bitrate: 3000000 }}
+  videoOrientation="portrait"
   onConnectionFailed={() => ...}
   onConnectionStarted={() => ...}
   onConnectionSuccess={() => ...}
@@ -164,11 +165,12 @@ async function publisherActions() {
 
 ## Props
 
-|       Name        |        Type         | Required |                    Description                     | Android | iOS |
-| :---------------: | :-----------------: | :------: | :------------------------------------------------: | :-----: | :-: |
-|    `streamURL`    |      `string`       |  `true`  |       Publish URL address with RTMP Protocol       |   ✅    | ✅  |
-|   `streamName`    |      `string`       |  `true`  |                Stream name or key                  |   ✅    | ✅  |
-|  `videoSettings`  | `VideoSettingsType` | `false`  | Video settings (resolution, bitrate) for the stream |   ❌    | ✅  |
+|       Name         |        Type         | Required |                    Description                      | Android | iOS |
+| :----------------: | :-----------------: | :------: | :-------------------------------------------------: | :-----: | :-: |
+|    `streamURL`     |      `string`       |  `true`  |       Publish URL address with RTMP Protocol        |   ✅    | ✅  |
+|   `streamName`     |      `string`       |  `true`  |                Stream name or key                   |   ✅    | ✅  |
+|  `videoSettings`   | `VideoSettingsType` | `false`  | Video settings (resolution, bitrate) for the stream |   ❌    | ✅  |
+| `videoOrientation` | `VideoOrientation`  | `false`  | Video orientation for the stream (`portrait` or `landscape`) |   ❌    | ✅  |
 
 ### Youtube Example
 
@@ -226,10 +228,12 @@ For live stream, Youtube gives you stream url and stream key, you can place the 
 | `BluetoothDeviceStatuses` | `CONNECTING`, `CONNECTED`, `DISCONNECTED`                     |
 | `AudioInputType`          | `BLUETOOTH_HEADSET`, `SPEAKER`, `WIRED_HEADSET`               |
 | `VideoSettingsType`       | `{ width: number, height: number, bitrate: number, audioBitrate?: number }` |
+| `VideoOrientation`        | `portrait`, `landscape`                                       |
 
 ### Notes
 * `AudioInputType`: `WIRED_HEADSET` type is only supported on iOS. On Android it has no effect. If a wired headset is connected to an Android device, the device uses it as default.
 * `VideoSettingsType`: The `audioBitrate` property is optional and defaults to 128000 (128 kbps) if not provided. This type is only supported on iOS.
+* `VideoOrientation`: Controls the video orientation for the stream output. Defaults to `portrait`. Use `landscape` for horizontal streaming. This is only supported on iOS.
 * `StreamState.CLOSED`: The `CLOSED` state is emitted when the RTMP connection is closed. This is useful for detecting when the stream has ended and taking appropriate action.
 
 ## Used Native Packages

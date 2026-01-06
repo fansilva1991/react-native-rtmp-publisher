@@ -52,7 +52,32 @@ class RTMPView: UIView {
         let bitrate = videoSettings["bitrate"] as? Int ?? (3000 * 1000)
         let audioBitrate = videoSettings["audioBitrate"] as? Int ?? (128 * 1000)
 
+        // Update capture preset to match output resolution
+        let preset = selectCapturePreset(for: width, height: height)
+        RTMPCreator.stream.captureSettings[.sessionPreset] = preset
+
         RTMPCreator.setVideoSettings(VideoSettingsType(width: width, height: height, bitrate: bitrate, audioBitrate: audioBitrate))
+    }
+  }
+
+  @objc var videoOrientation: NSString = "portrait" {
+    didSet {
+      applyVideoOrientation()
+    }
+  }
+
+  private func applyVideoOrientation() {
+    guard let connection = RTMPCreator.stream.videoCapture(for: 0)?.connection else {
+      return
+    }
+
+    if connection.isVideoOrientationSupported {
+      switch videoOrientation {
+      case "landscape":
+        connection.videoOrientation = .landscapeRight
+      default:
+        connection.videoOrientation = .portrait
+      }
     }
   }
 
@@ -103,6 +128,17 @@ class RTMPView: UIView {
     }
   }
 
+  private func selectCapturePreset(for width: Int, height: Int) -> AVCaptureSession.Preset {
+      let maxDimension = max(width, height)
+      if maxDimension <= 640 {
+          return .vga640x480
+      } else if maxDimension <= 1280 {
+          return .hd1280x720
+      } else {
+          return .hd1920x1080
+      }
+  }
+
   override init(frame: CGRect) {
     super.init(frame: frame)
     UIApplication.shared.isIdleTimerDisabled = true
@@ -112,7 +148,7 @@ class RTMPView: UIView {
     
     RTMPCreator.stream.captureSettings = [
         .fps: 30,
-        .sessionPreset: AVCaptureSession.Preset.hd1920x1080,
+        .sessionPreset: selectCapturePreset(for: RTMPCreator.videoSettings.width, height: RTMPCreator.videoSettings.height),
         .continuousAutofocus: true,
         .continuousExposure: true
     ]
@@ -131,6 +167,7 @@ class RTMPView: UIView {
 
     updateAudioAttachment()
     RTMPCreator.stream.attachCamera(DeviceUtil.device(withPosition: AVCaptureDevice.Position.back))
+    applyVideoOrientation()
 
     RTMPCreator.connection.addEventListener(.rtmpStatus, selector: #selector(statusHandler), observer: self)
 
