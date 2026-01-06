@@ -63,6 +63,7 @@ export interface RTMPPublisherProps {
   style?: ViewStyle;
   streamURL: string;
   streamName: string;
+  enableAudio?: boolean;
   onConnectionFailed?: (e: null) => void;
   onConnectionStarted?: (e: null) => void;
   onConnectionSuccess?: (e: null) => void;

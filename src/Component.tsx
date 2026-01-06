@@ -22,6 +22,7 @@ export interface NativeRTMPPublisherProps {
   style?: ViewStyle;
   streamURL: string;
   streamName: string;
+  enableAudio?: boolean;
   onConnectionFailed?: (e: ConnectionFailedType) => void;
   onConnectionStarted?: (e: ConnectionStartedType) => void;
   onConnectionSuccess?: (e: ConnectionSuccessType) => void;

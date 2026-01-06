@@ -30,4 +30,6 @@ RCT_EXPORT_VIEW_PROPERTY(onNewBitrateReceived, RCTDirectEventBlock)
 
 RCT_EXPORT_VIEW_PROPERTY(onStreamStateChanged, RCTDirectEventBlock)
 
+RCT_EXPORT_VIEW_PROPERTY(enableAudio, BOOL)
+
 @end

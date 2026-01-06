@@ -11,6 +11,8 @@ import AVFoundation
 
 class RTMPView: UIView {
   private var hkView: MTHKView!
+  private var pendingAudioUpdateAttempts = 0
+  private let maxAudioUpdateAttempts = 10
   @objc var onDisconnect: RCTDirectEventBlock?
   @objc var onConnectionFailed: RCTDirectEventBlock?
   @objc var onConnectionStarted: RCTDirectEventBlock?
@@ -29,7 +31,59 @@ class RTMPView: UIView {
       RTMPCreator.setStreamName(name: streamName as String)
     }
   }
-  
+  @objc var enableAudio: Bool = true {
+    didSet {
+      updateAudioAttachment()
+    }
+  }
+
+  private func configureAudioSession() {
+    let session = AVAudioSession.sharedInstance()
+
+    do {
+      try session.setCategory(
+        .playAndRecord,
+        mode: .videoChat,
+        options: [.defaultToSpeaker, .allowBluetooth]
+      )
+      try session.setPreferredSampleRate(44100)
+      try session.setPreferredIOBufferDuration(0.005)
+
+      if let input = session.availableInputs?.first(where: { input in
+        return input.portType == .builtInMic
+      }) {
+        try session.setPreferredInput(input)
+      }
+
+      try session.setActive(true)
+    } catch {
+      NSLog("RTMPView: Failed to configure AVAudioSession: %@", error.localizedDescription)
+    }
+  }
+
+  private func updateAudioAttachment() {
+    if RTMPCreator.isStreaming {
+      if pendingAudioUpdateAttempts >= maxAudioUpdateAttempts {
+        NSLog("RTMPView: Skipping audio update; stream still active.")
+        return
+      }
+
+      pendingAudioUpdateAttempts += 1
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+        self?.updateAudioAttachment()
+      }
+      return
+    }
+
+    pendingAudioUpdateAttempts = 0
+    if enableAudio {
+      configureAudioSession()
+      RTMPCreator.stream.attachAudio(AVCaptureDevice.default(for: .audio))
+    } else {
+      RTMPCreator.stream.attachAudio(nil)
+    }
+  }
+
   override init(frame: CGRect) {
     super.init(frame: frame)
     UIApplication.shared.isIdleTimerDisabled = true
@@ -52,7 +106,7 @@ class RTMPView: UIView {
         
     ]
 
-    RTMPCreator.stream.attachAudio(AVCaptureDevice.default(for: .audio))
+    updateAudioAttachment()
     RTMPCreator.stream.attachCamera(DeviceUtil.device(withPosition: AVCaptureDevice.Position.back))
 
     RTMPCreator.connection.addEventListener(.rtmpStatus, selector: #selector(statusHandler), observer: self)
