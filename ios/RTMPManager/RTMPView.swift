@@ -67,17 +67,11 @@ class RTMPView: UIView {
   }
 
   private func applyVideoOrientation() {
-    guard let connection = RTMPCreator.stream.videoCapture(for: 0)?.connection else {
-      return
-    }
-
-    if connection.isVideoOrientationSupported {
-      switch videoOrientation {
-      case "landscape":
-        connection.videoOrientation = .landscapeRight
-      default:
-        connection.videoOrientation = .portrait
-      }
+    switch videoOrientation {
+    case "landscape":
+      RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.landscapeRight
+    default:
+      RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.portrait
     }
   }
 
