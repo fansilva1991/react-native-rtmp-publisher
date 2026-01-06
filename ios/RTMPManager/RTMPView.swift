@@ -75,6 +75,26 @@ class RTMPView: UIView {
     }
   }
 
+  private func cleanup() {
+    // Stop streaming if active
+    if RTMPCreator.isStreaming {
+      RTMPCreator.stopPublish()
+    }
+
+    // Detach view from stream (critical - prevents crash)
+    hkView.attachStream(nil)
+
+    // Remove event listener
+    RTMPCreator.connection.removeEventListener(.rtmpStatus, selector: #selector(statusHandler), observer: self)
+
+    // Detach camera and audio
+    RTMPCreator.stream.attachCamera(nil)
+    RTMPCreator.stream.attachAudio(nil)
+
+    // Re-enable idle timer
+    UIApplication.shared.isIdleTimerDisabled = false
+  }
+
   private func configureAudioSession() {
     let session = AVAudioSession.sharedInstance()
 
@@ -176,7 +196,12 @@ class RTMPView: UIView {
      }
     
     override func removeFromSuperview() {
-        print("ON REMOVE")
+        cleanup()
+        super.removeFromSuperview()
+    }
+
+    deinit {
+        cleanup()
     }
   
     @objc
