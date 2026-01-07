@@ -107,7 +107,10 @@ class RTMPCreator {
     }
     
     private static func switchToSpeaker(){
-        let inputs: [AVAudioSessionPortDescription] = session.availableInputs!
+        guard let inputs = session.availableInputs, !inputs.isEmpty else {
+            NSLog("RTMPCreator: No available audio inputs for speaker switch.")
+            return
+        }
         
         if let selectedDesc = inputs.first(where: { (desc) -> Bool in
             return desc.portType == AVAudioSession.Port.builtInMic
@@ -127,7 +130,10 @@ class RTMPCreator {
     }
       
     private static func switchToHeadset(){
-        let inputs: [AVAudioSessionPortDescription] = session.availableInputs!
+        guard let inputs = session.availableInputs, !inputs.isEmpty else {
+            NSLog("RTMPCreator: No available audio inputs for headset switch.")
+            return
+        }
 
         if let selectedDesc = inputs.first(where: { (desc) -> Bool in
             return desc.portType == AVAudioSession.Port.headsetMic
@@ -141,7 +147,10 @@ class RTMPCreator {
     }
     
     private static func switchToBluetooth(){
-        let inputs: [AVAudioSessionPortDescription] = session.availableInputs!
+        guard let inputs = session.availableInputs, !inputs.isEmpty else {
+            NSLog("RTMPCreator: No available audio inputs for bluetooth switch.")
+            return
+        }
         
         if let selectedDesc = inputs.first(where: { (desc) -> Bool in
             return desc.portType == AVAudioSession.Port.bluetoothHFP
