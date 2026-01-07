@@ -54,7 +54,9 @@ class RTMPView: UIView {
 
         // Update capture preset to match output resolution
         let preset = selectCapturePreset(for: width, height: height)
-        RTMPCreator.stream.captureSettings[.sessionPreset] = preset
+        RTMPCreator.performCaptureConfiguration {
+          RTMPCreator.stream.captureSettings[.sessionPreset] = preset
+        }
 
         RTMPCreator.setVideoSettings(VideoSettingsType(width: width, height: height, bitrate: bitrate, audioBitrate: audioBitrate))
     }
@@ -67,11 +69,13 @@ class RTMPView: UIView {
   }
 
   private func applyVideoOrientation() {
-    switch videoOrientation {
-    case "landscape":
-      RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.landscapeRight
-    default:
-      RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.portrait
+    RTMPCreator.performCaptureConfiguration {
+      switch videoOrientation {
+      case "landscape":
+        RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.landscapeRight
+      default:
+        RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.portrait
+      }
     }
   }
 
@@ -88,8 +92,10 @@ class RTMPView: UIView {
     RTMPCreator.connection.removeEventListener(.rtmpStatus, selector: #selector(statusHandler), observer: self)
 
     // Detach camera and audio
-    RTMPCreator.stream.attachCamera(nil)
-    RTMPCreator.stream.attachAudio(nil)
+    RTMPCreator.performCaptureConfiguration {
+      RTMPCreator.stream.attachCamera(nil)
+      RTMPCreator.stream.attachAudio(nil)
+    }
 
     // Re-enable idle timer
     UIApplication.shared.isIdleTimerDisabled = false
@@ -136,9 +142,13 @@ class RTMPView: UIView {
     pendingAudioUpdateAttempts = 0
     if enableAudio {
       configureAudioSession()
-      RTMPCreator.stream.attachAudio(AVCaptureDevice.default(for: .audio))
+      RTMPCreator.performCaptureConfiguration {
+        RTMPCreator.stream.attachAudio(AVCaptureDevice.default(for: .audio))
+      }
     } else {
-      RTMPCreator.stream.attachAudio(nil)
+      RTMPCreator.performCaptureConfiguration {
+        RTMPCreator.stream.attachAudio(nil)
+      }
     }
   }
 
@@ -160,27 +170,31 @@ class RTMPView: UIView {
     hkView = MTHKView(frame: UIScreen.main.bounds)
     hkView.videoGravity = .resizeAspectFill
     
-    RTMPCreator.stream.captureSettings = [
-        .fps: 30,
-        .sessionPreset: selectCapturePreset(for: RTMPCreator.videoSettings.width, height: RTMPCreator.videoSettings.height),
-        .continuousAutofocus: true,
-        .continuousExposure: true
-    ]
+    RTMPCreator.performCaptureConfiguration {
+      RTMPCreator.stream.captureSettings = [
+          .fps: 30,
+          .sessionPreset: selectCapturePreset(for: RTMPCreator.videoSettings.width, height: RTMPCreator.videoSettings.height),
+          .continuousAutofocus: true,
+          .continuousExposure: true
+      ]
 
-    RTMPCreator.stream.audioSettings = [
-        .bitrate: RTMPCreator.videoSettings.audioBitrate
-    ]
+      RTMPCreator.stream.audioSettings = [
+          .bitrate: RTMPCreator.videoSettings.audioBitrate
+      ]
 
-    RTMPCreator.stream.videoSettings = [
-        .width: RTMPCreator.videoSettings.width,
-        .height: RTMPCreator.videoSettings.height,
-        .bitrate: RTMPCreator.videoSettings.bitrate,
-        .scalingMode: ScalingMode.cropSourceToCleanAperture,
-        .profileLevel: kVTProfileLevel_H264_High_AutoLevel
-    ]
+      RTMPCreator.stream.videoSettings = [
+          .width: RTMPCreator.videoSettings.width,
+          .height: RTMPCreator.videoSettings.height,
+          .bitrate: RTMPCreator.videoSettings.bitrate,
+          .scalingMode: ScalingMode.cropSourceToCleanAperture,
+          .profileLevel: kVTProfileLevel_H264_High_AutoLevel
+      ]
+    }
 
     updateAudioAttachment()
-    RTMPCreator.stream.attachCamera(DeviceUtil.device(withPosition: AVCaptureDevice.Position.back))
+    RTMPCreator.performCaptureConfiguration {
+      RTMPCreator.stream.attachCamera(DeviceUtil.device(withPosition: AVCaptureDevice.Position.back))
+    }
     applyVideoOrientation()
 
     RTMPCreator.connection.addEventListener(.rtmpStatus, selector: #selector(statusHandler), observer: self)

@@ -5,6 +5,7 @@
 //  Created by Ezran Bayantemur on 15.01.2022.
 //
 import HaishinKit
+import Foundation
 import AVFoundation
 import VideoToolbox
 
@@ -18,6 +19,7 @@ struct VideoSettingsType {
 class RTMPCreator {
     public static let connection: RTMPConnection = RTMPConnection()
     public static let stream: RTMPStream = RTMPStream(connection: connection)
+    private static let captureQueue = DispatchQueue(label: "com.sportninja.rtmp.capture")
     private static let session = AVAudioSession.sharedInstance()
     private static var _streamUrl: String = ""
     private static var _streamName: String = ""
@@ -56,19 +58,27 @@ class RTMPCreator {
         isStreaming = true
     }
 
+    public static func performCaptureConfiguration(_ block: @escaping () -> Void) {
+        captureQueue.async {
+            block()
+        }
+    }
+
     public static func setVideoSettings(_ newVideoSettings: VideoSettingsType) {
         videoSettings = newVideoSettings
-        stream.videoSettings = [
-            .width: videoSettings.width,
-            .height: videoSettings.height,
-            .bitrate: videoSettings.bitrate,
-            .scalingMode: ScalingMode.cropSourceToCleanAperture,
-            .profileLevel: kVTProfileLevel_H264_High_AutoLevel
-        ]
+        performCaptureConfiguration {
+            stream.videoSettings = [
+                .width: videoSettings.width,
+                .height: videoSettings.height,
+                .bitrate: videoSettings.bitrate,
+                .scalingMode: ScalingMode.cropSourceToCleanAperture,
+                .profileLevel: kVTProfileLevel_H264_High_AutoLevel
+            ]
 
-        stream.audioSettings = [
-            .bitrate: videoSettings.audioBitrate
-        ]
+            stream.audioSettings = [
+                .bitrate: videoSettings.audioBitrate
+            ]
+        }
     }
 
     public static func stopPublish(){
