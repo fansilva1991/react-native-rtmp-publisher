@@ -52,10 +52,12 @@ class RTMPCreator {
     }
   
     public static func startPublish(){
-        connection.requireNetworkFramework = true
-        connection.connect(_streamUrl)
-        stream.publish(_streamName)
-        isStreaming = true
+        performCaptureConfiguration {
+            connection.requireNetworkFramework = true
+            connection.connect(_streamUrl)
+            stream.publish(_streamName)
+            isStreaming = true
+        }
     }
 
     public static func performCaptureConfiguration(_ block: @escaping () -> Void) {
@@ -82,27 +84,31 @@ class RTMPCreator {
     }
 
     public static func stopPublish(){
-        stream.close()
-        connection.close()
-        isStreaming = false
+        performCaptureConfiguration {
+            stream.close()
+            connection.close()
+            isStreaming = false
+        }
     }
     
     public static func setAudioInput(audioInput: Int){
-        switch audioInput {
-        case 0:
-            switchToBluetooth()
-            break;
+        performCaptureConfiguration {
+            switch audioInput {
+            case 0:
+                switchToBluetooth()
+                break;
 
-        case 1:
-            switchToSpeaker()
-            break;
+            case 1:
+                switchToSpeaker()
+                break;
 
-        case 2:
-            switchToHeadset()
-            break;
+            case 2:
+                switchToHeadset()
+                break;
 
-        default:
-            return;
+            default:
+                return
+            }
         }
     }
     
