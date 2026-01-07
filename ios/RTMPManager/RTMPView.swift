@@ -70,7 +70,7 @@ class RTMPView: UIView {
 
   private func applyVideoOrientation() {
     RTMPCreator.performCaptureConfiguration {
-      switch videoOrientation {
+      switch self.videoOrientation {
       case "landscape":
         RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.landscapeRight
       default:
@@ -173,7 +173,7 @@ class RTMPView: UIView {
     RTMPCreator.performCaptureConfiguration {
       RTMPCreator.stream.captureSettings = [
           .fps: 30,
-          .sessionPreset: selectCapturePreset(for: RTMPCreator.videoSettings.width, height: RTMPCreator.videoSettings.height),
+          .sessionPreset: self.selectCapturePreset(for: RTMPCreator.videoSettings.width, height: RTMPCreator.videoSettings.height),
           .continuousAutofocus: true,
           .continuousExposure: true
       ]

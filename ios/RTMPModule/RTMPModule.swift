@@ -39,7 +39,7 @@ class RTMPModule: NSObject {
     func switchCamera(_ resolve: (RCTPromiseResolveBlock), reject: (RCTPromiseRejectBlock)){
         cameraPosition = cameraPosition == .back ? .front : .back
         RTMPCreator.performCaptureConfiguration {
-            RTMPCreator.stream.attachCamera(DeviceUtil.device(withPosition: cameraPosition))
+            RTMPCreator.stream.attachCamera(DeviceUtil.device(withPosition: self.cameraPosition))
         }
     }
 
