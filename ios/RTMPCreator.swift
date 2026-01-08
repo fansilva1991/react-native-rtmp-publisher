@@ -55,7 +55,6 @@ class RTMPCreator {
         performCaptureConfiguration {
             connection.requireNetworkFramework = true
             connection.connect(_streamUrl)
-            stream.publish(_streamName)
             isStreaming = true
         }
     }
