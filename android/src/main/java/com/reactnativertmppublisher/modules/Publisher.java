@@ -186,7 +186,7 @@ public class Publisher {
   public void startStream() {
     try {
       boolean isAudioPrepared = _rtmpCamera.prepareAudio(MediaRecorder.AudioSource.DEFAULT, _audioBitrate, 44100, true, false, false);
-      boolean isVideoPrepared = _rtmpCamera.prepareVideo(_videoWidth, _videoHeight, _fps, _videoBitrate);
+      boolean isVideoPrepared = _rtmpCamera.prepareVideo(_videoWidth, _videoHeight, _fps, _videoBitrate, 0);
 
       if (!isAudioPrepared || !isVideoPrepared || _streamName == null || _streamUrl == null) {
         return;
