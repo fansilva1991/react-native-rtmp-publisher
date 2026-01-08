@@ -87,4 +87,20 @@ RCT_EXTERN_METHOD(
                     reject: (RCTPromiseRejectBlock)reject
                   )
 
+RCT_EXTERN_METHOD(
+                    setZoom: (double)zoomLevel
+                    resolve: (RCTPromiseResolveBlock)resolve
+                    reject: (RCTPromiseRejectBlock)reject
+                  )
+
+RCT_EXTERN_METHOD(
+                    getMaxZoom: (RCTPromiseResolveBlock)resolve
+                    reject: (RCTPromiseRejectBlock)reject
+                  )
+
+RCT_EXTERN_METHOD(
+                    getMinZoom: (RCTPromiseResolveBlock)resolve
+                    reject: (RCTPromiseRejectBlock)reject
+                  )
+
 @end

@@ -238,6 +238,18 @@ public class Publisher {
       }
     }
   }
+
+  public void setZoom(int level) {
+    _rtmpCamera.setZoom(level);
+  }
+
+  public int getMaxZoom() {
+    return _rtmpCamera.getMaxZoom();
+  }
+
+  public int getMinZoom() {
+    return _rtmpCamera.getMinZoom();
+  }
   //endregion
 
 }

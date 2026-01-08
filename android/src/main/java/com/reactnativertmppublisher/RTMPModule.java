@@ -163,4 +163,34 @@ public class RTMPModule extends ReactContextBaseJavaModule {
       promise.reject(e);
     }
   }
+
+  @ReactMethod
+  public void setZoom(int zoomLevel, Promise promise) {
+    try {
+      RTMPManager.publisher.setZoom(zoomLevel);
+      promise.resolve(zoomLevel);
+    } catch (Exception e) {
+      promise.reject(e);
+    }
+  }
+
+  @ReactMethod
+  public void getMaxZoom(Promise promise) {
+    try {
+      int maxZoom = RTMPManager.publisher.getMaxZoom();
+      promise.resolve(maxZoom);
+    } catch (Exception e) {
+      promise.reject(e);
+    }
+  }
+
+  @ReactMethod
+  public void getMinZoom(Promise promise) {
+    try {
+      int minZoom = RTMPManager.publisher.getMinZoom();
+      promise.resolve(minZoom);
+    } catch (Exception e) {
+      promise.reject(e);
+    }
+  }
 }

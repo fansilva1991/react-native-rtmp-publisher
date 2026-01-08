@@ -110,6 +110,12 @@ const RTMPPublisher = forwardRef<RTMPPublisherRefProps, RTMPPublisherProps>(
     const setVideoSettings = async (videoSettings: VideoSettingsType) =>
       RTMPModule.setVideoSettings(videoSettings);
 
+    const setZoom = async (zoomLevel: number) => RTMPModule.setZoom(zoomLevel);
+
+    const getMaxZoom = async () => RTMPModule.getMaxZoom();
+
+    const getMinZoom = async () => RTMPModule.getMinZoom();
+
     const handleOnConnectionFailed = (e: ConnectionFailedType) => {
       onConnectionFailed && onConnectionFailed(e.nativeEvent.data);
     };
@@ -157,6 +163,9 @@ const RTMPPublisher = forwardRef<RTMPPublisherRefProps, RTMPPublisherProps>(
       toggleFlash,
       setAudioInput,
       setVideoSettings,
+      setZoom,
+      getMaxZoom,
+      getMinZoom,
     }));
 
     return (

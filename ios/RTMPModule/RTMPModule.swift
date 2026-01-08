@@ -91,4 +91,63 @@ class RTMPModule: NSObject {
 
         resolve(RTMPCreator.setVideoSettings(videoSettings))
     }
+
+    @objc
+    func setZoom(_ zoomLevel: Double, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        guard let device = DeviceUtil.device(withPosition: cameraPosition) else {
+            reject("CAMERA_ERROR", "Camera device not available", nil)
+            return
+        }
+
+        RTMPCreator.performCaptureConfiguration {
+            do {
+                try device.lockForConfiguration()
+
+                let maxZoom = min(device.activeFormat.videoMaxZoomFactor, 10.0)
+                let minZoom: CGFloat
+                if #available(iOS 11.0, *) {
+                    minZoom = device.minAvailableVideoZoomFactor
+                } else {
+                    minZoom = 1.0
+                }
+                let clampedZoom = max(minZoom, min(CGFloat(zoomLevel), maxZoom))
+
+                device.videoZoomFactor = clampedZoom
+                device.unlockForConfiguration()
+
+                DispatchQueue.main.async {
+                    resolve(clampedZoom)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    reject("ZOOM_ERROR", "Failed to set zoom: \(error.localizedDescription)", error)
+                }
+            }
+        }
+    }
+
+    @objc
+    func getMaxZoom(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        guard let device = DeviceUtil.device(withPosition: cameraPosition) else {
+            reject("CAMERA_ERROR", "Camera device not available", nil)
+            return
+        }
+
+        let maxZoom = min(device.activeFormat.videoMaxZoomFactor, 10.0)
+        resolve(maxZoom)
+    }
+
+    @objc
+    func getMinZoom(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        guard let device = DeviceUtil.device(withPosition: cameraPosition) else {
+            reject("CAMERA_ERROR", "Camera device not available", nil)
+            return
+        }
+
+        if #available(iOS 11.0, *) {
+            resolve(device.minAvailableVideoZoomFactor)
+        } else {
+            resolve(1.0)
+        }
+    }
 }

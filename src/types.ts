@@ -61,6 +61,22 @@ export interface RTMPPublisherRefProps {
    * Sets video settings (resolution, bitrate)
    */
   setVideoSettings: (videoSettings: VideoSettingsType) => Promise<void>;
+  /**
+   * Sets the camera zoom level
+   * @param zoomLevel - The desired zoom level (use getMinZoom/getMaxZoom to determine valid range)
+   * @returns The actual zoom level that was set (may be clamped to valid range)
+   */
+  setZoom: (zoomLevel: number) => Promise<number>;
+  /**
+   * Gets the maximum zoom level supported by the current camera
+   * @returns Maximum zoom level (iOS: CGFloat ~1.0-10.0, Android: int varies by device)
+   */
+  getMaxZoom: () => Promise<number>;
+  /**
+   * Gets the minimum zoom level supported by the current camera
+   * @returns Minimum zoom level (typically 1.0 on iOS, varies on Android)
+   */
+  getMinZoom: () => Promise<number>;
 }
 
 export interface RTMPPublisherProps {
