@@ -123,6 +123,11 @@ export interface VideoSettingsType {
   height: number;
   bitrate: number;
   audioBitrate?: number;
+  /**
+   * Frames per second for the stream
+   * @default 30
+   */
+  fps?: number;
 }
 
 export type VideoOrientation = 'portrait' | 'landscape';

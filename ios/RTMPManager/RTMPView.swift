@@ -14,6 +14,7 @@ class RTMPView: UIView {
   private var hkView: MTHKView!
   private var pendingAudioUpdateAttempts = 0
   private let maxAudioUpdateAttempts = 10
+  private var hasAppliedInitialSettings = false
   @objc var onDisconnect: RCTDirectEventBlock?
   @objc var onConnectionFailed: RCTDirectEventBlock?
   @objc var onConnectionStarted: RCTDirectEventBlock?
@@ -43,23 +44,29 @@ class RTMPView: UIView {
         "width": 720,
         "height": 1280,
         "bitrate": 3000 * 1000,
-        "audioBitrate": 128 * 1000
+        "audioBitrate": 128 * 1000,
+        "fps": 30
       ]
   ){
     didSet {
-        let width = videoSettings["width"] as? Int ?? 720
-        let height = videoSettings["height"] as? Int ?? 1280
-        let bitrate = videoSettings["bitrate"] as? Int ?? (3000 * 1000)
-        let audioBitrate = videoSettings["audioBitrate"] as? Int ?? (128 * 1000)
-
-        // Update capture preset to match output resolution
-        let preset = selectCapturePreset(for: width, height: height)
-        RTMPCreator.performCaptureConfiguration {
-          RTMPCreator.stream.captureSettings[.sessionPreset] = preset
-        }
-
-        RTMPCreator.setVideoSettings(VideoSettingsType(width: width, height: height, bitrate: bitrate, audioBitrate: audioBitrate))
+        applyVideoSettings()
     }
+  }
+
+  private func applyVideoSettings() {
+      let width = videoSettings["width"] as? Int ?? 720
+      let height = videoSettings["height"] as? Int ?? 1280
+      let bitrate = videoSettings["bitrate"] as? Int ?? (3000 * 1000)
+      let audioBitrate = videoSettings["audioBitrate"] as? Int ?? (128 * 1000)
+      let fps = videoSettings["fps"] as? Int ?? 30
+
+      // Update capture preset to match output resolution
+      let preset = selectCapturePreset(for: width, height: height)
+      RTMPCreator.performCaptureConfiguration {
+        RTMPCreator.stream.captureSettings[.sessionPreset] = preset
+      }
+
+      RTMPCreator.setVideoSettings(VideoSettingsType(width: width, height: height, bitrate: bitrate, audioBitrate: audioBitrate, fps: fps))
   }
 
   @objc var videoOrientation: NSString = "portrait" {
@@ -166,28 +173,16 @@ class RTMPView: UIView {
   override init(frame: CGRect) {
     super.init(frame: frame)
     UIApplication.shared.isIdleTimerDisabled = true
-    
+
     hkView = MTHKView(frame: UIScreen.main.bounds)
     hkView.videoGravity = .resizeAspectFill
-    
+
+    // Only set up capture settings that don't depend on props
+    // fps is applied later via applyVideoSettings() after props are set
     RTMPCreator.performCaptureConfiguration {
       RTMPCreator.stream.captureSettings = [
-          .fps: 30,
-          .sessionPreset: self.selectCapturePreset(for: RTMPCreator.videoSettings.width, height: RTMPCreator.videoSettings.height),
           .continuousAutofocus: true,
           .continuousExposure: true
-      ]
-
-      RTMPCreator.stream.audioSettings = [
-          .bitrate: RTMPCreator.videoSettings.audioBitrate
-      ]
-
-      RTMPCreator.stream.videoSettings = [
-          .width: RTMPCreator.videoSettings.width,
-          .height: RTMPCreator.videoSettings.height,
-          .bitrate: RTMPCreator.videoSettings.bitrate,
-          .scalingMode: ScalingMode.cropSourceToCleanAperture,
-          .profileLevel: kVTProfileLevel_H264_High_AutoLevel
       ]
     }
 
@@ -195,15 +190,27 @@ class RTMPView: UIView {
     RTMPCreator.performCaptureConfiguration {
       RTMPCreator.stream.attachCamera(DeviceUtil.device(withPosition: AVCaptureDevice.Position.back))
     }
-    applyVideoOrientation()
 
     RTMPCreator.connection.addEventListener(.rtmpStatus, selector: #selector(statusHandler), observer: self)
 
     hkView.attachStream(RTMPCreator.stream)
 
     self.addSubview(hkView)
-      
-}
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+
+    // Apply initial settings after props have been set by React Native
+    if !hasAppliedInitialSettings {
+      hasAppliedInitialSettings = true
+      applyVideoSettings()
+      applyVideoOrientation()
+    }
+
+    // Update hkView frame to match this view's bounds
+    hkView.frame = self.bounds
+  }
     
     required init?(coder aDecoder: NSCoder) {
        fatalError("init(coder:) has not been implemented")

@@ -14,6 +14,7 @@ struct VideoSettingsType {
     var height: Int
     var bitrate: Int
     var audioBitrate: Int
+    var fps: Int
 }
 
 class RTMPCreator {
@@ -28,7 +29,8 @@ class RTMPCreator {
         width: 720,
         height: 1280,
         bitrate: 3000 * 1024,
-        audioBitrate: 128 * 1000
+        audioBitrate: 128 * 1000,
+        fps: 30
     )
 
     public static func setStreamUrl(url: String){
@@ -68,6 +70,8 @@ class RTMPCreator {
     public static func setVideoSettings(_ newVideoSettings: VideoSettingsType) {
         videoSettings = newVideoSettings
         performCaptureConfiguration {
+            stream.captureSettings[.fps] = videoSettings.fps
+
             stream.videoSettings = [
                 .width: videoSettings.width,
                 .height: videoSettings.height,
