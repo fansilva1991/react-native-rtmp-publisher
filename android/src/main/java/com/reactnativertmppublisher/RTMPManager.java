@@ -6,6 +6,7 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.common.MapBuilder;
 import com.facebook.react.uimanager.SimpleViewManager;
 import com.facebook.react.uimanager.ThemedReactContext;
@@ -58,6 +59,21 @@ public class RTMPManager extends SimpleViewManager<SurfaceView> {
   @ReactProp(name = "streamName")
   public void setStreamName(SurfaceView surfaceView, @Nullable String name) {
     publisher.setStreamName(name);
+  }
+
+  @ReactProp(name = "videoSettings")
+  public void setVideoSettings(SurfaceView surfaceView, @Nullable ReadableMap videoSettings) {
+    if (videoSettings == null) {
+      return;
+    }
+
+    int width = videoSettings.hasKey("width") ? videoSettings.getInt("width") : 1280;
+    int height = videoSettings.hasKey("height") ? videoSettings.getInt("height") : 720;
+    int bitrate = videoSettings.hasKey("bitrate") ? videoSettings.getInt("bitrate") : 3000 * 1024;
+    int audioBitrate = videoSettings.hasKey("audioBitrate") ? videoSettings.getInt("audioBitrate") : 128 * 1024;
+    int fps = videoSettings.hasKey("fps") ? videoSettings.getInt("fps") : 30;
+
+    publisher.setVideoSettings(width, height, bitrate, audioBitrate, fps);
   }
 
   @Nullable

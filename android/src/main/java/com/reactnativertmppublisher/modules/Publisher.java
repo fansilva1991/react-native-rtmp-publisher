@@ -25,6 +25,14 @@ public class Publisher {
   private final AudioManager _mAudioManager;
   private String _streamUrl;
   private String _streamName;
+
+  // Video settings with defaults
+  private int _videoWidth = 1280;
+  private int _videoHeight = 720;
+  private int _videoBitrate = 3000 * 1024;
+  private int _audioBitrate = 128 * 1024;
+  private int _fps = 30;
+
   ConnectionChecker _connectionChecker = new ConnectionChecker();
   BluetoothDeviceConnector _bluetoothDeviceConnector;
 
@@ -177,8 +185,8 @@ public class Publisher {
 
   public void startStream() {
     try {
-      boolean isAudioPrepared = _rtmpCamera.prepareAudio(MediaRecorder.AudioSource.DEFAULT, 128 * 1024, 44100, true, false, false);
-      boolean isVideoPrepared = _rtmpCamera.prepareVideo(1280 , 720, 3000 * 1024);
+      boolean isAudioPrepared = _rtmpCamera.prepareAudio(MediaRecorder.AudioSource.DEFAULT, _audioBitrate, 44100, true, false, false);
+      boolean isVideoPrepared = _rtmpCamera.prepareVideo(_videoWidth, _videoHeight, _fps, _videoBitrate);
 
       if (!isAudioPrepared || !isVideoPrepared || _streamName == null || _streamUrl == null) {
         return;
@@ -189,6 +197,14 @@ public class Publisher {
     } catch (Exception e) {
       e.printStackTrace();
     }
+  }
+
+  public void setVideoSettings(int width, int height, int bitrate, int audioBitrate, int fps) {
+    _videoWidth = width;
+    _videoHeight = height;
+    _videoBitrate = bitrate;
+    _audioBitrate = audioBitrate;
+    _fps = fps;
   }
 
   public void stopStream() {

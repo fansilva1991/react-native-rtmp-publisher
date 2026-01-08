@@ -87,7 +87,8 @@ class RTMPModule: NSObject {
             return
         }
         let audioBitrate = videoSettingsDict["audioBitrate"] as? Int ?? 128000
-        let videoSettings = VideoSettingsType(width: width, height: height, bitrate: bitrate, audioBitrate: audioBitrate)
+        let fps = videoSettingsDict["fps"] as? Int ?? 30
+        let videoSettings = VideoSettingsType(width: width, height: height, bitrate: bitrate, audioBitrate: audioBitrate, fps: fps)
 
         resolve(RTMPCreator.setVideoSettings(videoSettings))
     }

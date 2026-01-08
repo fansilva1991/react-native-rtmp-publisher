@@ -7,6 +7,7 @@ import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
+import com.facebook.react.bridge.ReadableMap;
 import com.reactnativertmppublisher.enums.AudioInputType;
 
 public class RTMPModule extends ReactContextBaseJavaModule {
@@ -159,6 +160,22 @@ public class RTMPModule extends ReactContextBaseJavaModule {
     try {
       AudioInputType selectedType = AudioInputType.values()[audioInputType];
       RTMPManager.publisher.setAudioInput(selectedType);
+    } catch (Exception e) {
+      promise.reject(e);
+    }
+  }
+
+  @ReactMethod
+  public void setVideoSettings(ReadableMap videoSettings, Promise promise) {
+    try {
+      int width = videoSettings.hasKey("width") ? videoSettings.getInt("width") : 1280;
+      int height = videoSettings.hasKey("height") ? videoSettings.getInt("height") : 720;
+      int bitrate = videoSettings.hasKey("bitrate") ? videoSettings.getInt("bitrate") : 3000 * 1024;
+      int audioBitrate = videoSettings.hasKey("audioBitrate") ? videoSettings.getInt("audioBitrate") : 128 * 1024;
+      int fps = videoSettings.hasKey("fps") ? videoSettings.getInt("fps") : 30;
+
+      RTMPManager.publisher.setVideoSettings(width, height, bitrate, audioBitrate, fps);
+      promise.resolve(null);
     } catch (Exception e) {
       promise.reject(e);
     }
