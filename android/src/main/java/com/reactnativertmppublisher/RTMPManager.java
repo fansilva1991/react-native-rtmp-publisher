@@ -89,4 +89,14 @@ public class RTMPManager extends SimpleViewManager<SurfaceView> {
       .put("onBluetoothDeviceStatusChanged", MapBuilder.of("registrationName", "onBluetoothDeviceStatusChanged"))
       .build();
   }
+
+  @Override
+  public void onDropViewInstance(@NonNull SurfaceView view) {
+    if (publisher != null) {
+      publisher.handleDestroy();
+      publisher = null;
+    }
+    view.removeOnLayoutChangeListener(onLayoutChangeListener);
+    super.onDropViewInstance(view);
+  }
 }

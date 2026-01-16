@@ -268,4 +268,97 @@ public class Publisher {
   }
   //endregion
 
+  //region LIFECYCLE METHODS
+  /**
+   * Called when app goes to background.
+   * Stops streaming and preview, releases camera/audio resources.
+   * @return true if was streaming before pause (for JS to know if reconnection is needed)
+   */
+  public boolean handlePause() {
+    boolean wasStreaming = false;
+    try {
+      wasStreaming = _rtmpCamera.isStreaming();
+      if (wasStreaming) {
+        _rtmpCamera.stopStream();
+      }
+    } catch (Exception e) {
+      Log.e("Publisher", "Error stopping stream on pause", e);
+    }
+
+    try {
+      if (_rtmpCamera.isOnPreview()) {
+        _rtmpCamera.stopPreview();
+      }
+    } catch (Exception e) {
+      Log.e("Publisher", "Error stopping preview on pause", e);
+    }
+
+    return wasStreaming;
+  }
+
+  /**
+   * Called when app returns to foreground.
+   * Preview restart is handled by SurfaceHolderHelper when surface is recreated.
+   * Stream restart should be handled by JS layer.
+   */
+  public void handleResume() {
+    // Preview will be restarted automatically by SurfaceHolderHelper
+    // when the surface is recreated.
+    // Stream reconnection should be handled by the JavaScript layer.
+  }
+
+  /**
+   * Called when view is being destroyed.
+   * Full cleanup: stops stream/preview, cleans up Bluetooth, unregisters receivers.
+   */
+  public void handleDestroy() {
+    try {
+      if (_rtmpCamera.isStreaming()) {
+        _rtmpCamera.stopStream();
+      }
+    } catch (Exception e) {
+      Log.e("Publisher", "Error stopping stream on destroy", e);
+    }
+
+    try {
+      if (_rtmpCamera.isOnPreview()) {
+        _rtmpCamera.stopPreview();
+      }
+    } catch (Exception e) {
+      Log.e("Publisher", "Error stopping preview on destroy", e);
+    }
+
+    // Cleanup Bluetooth
+    if (_bluetoothDeviceConnector != null) {
+      try {
+        _bluetoothDeviceConnector.unregister();
+        _bluetoothDeviceConnector.clearListeners();
+      } catch (Exception e) {
+        Log.e("Publisher", "Error cleaning up Bluetooth", e);
+      }
+    }
+
+    // Clear connection listeners
+    if (_connectionChecker != null) {
+      try {
+        _connectionChecker.clearListeners();
+      } catch (Exception e) {
+        Log.e("Publisher", "Error clearing connection listeners", e);
+      }
+    }
+
+    // Stop Bluetooth SCO if active
+    if (_mAudioManager != null) {
+      try {
+        if (_mAudioManager.isBluetoothScoOn()) {
+          _mAudioManager.stopBluetoothSco();
+          _mAudioManager.setBluetoothScoOn(false);
+        }
+      } catch (Exception e) {
+        Log.e("Publisher", "Error stopping Bluetooth SCO", e);
+      }
+    }
+  }
+  //endregion
+
 }

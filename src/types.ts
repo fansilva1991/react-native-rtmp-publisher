@@ -131,3 +131,13 @@ export interface VideoSettingsType {
 }
 
 export type VideoOrientation = 'portrait' | 'landscape';
+
+/**
+ * Data passed to lifecycle event callbacks (Android only)
+ */
+export interface LifecycleEventData {
+  /**
+   * Whether the app was streaming before going to background
+   */
+  wasStreaming: boolean;
+}

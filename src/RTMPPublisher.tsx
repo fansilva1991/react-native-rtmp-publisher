@@ -1,5 +1,10 @@
-import React, { forwardRef, useImperativeHandle } from 'react';
-import { NativeModules, type ViewStyle } from 'react-native';
+import React, { forwardRef, useImperativeHandle, useEffect } from 'react';
+import {
+  NativeModules,
+  NativeEventEmitter,
+  Platform,
+  type ViewStyle,
+} from 'react-native';
 import PublisherComponent, {
   type DisconnectType,
   type ConnectionFailedType,
@@ -16,6 +21,7 @@ import type {
   AudioInputType,
   VideoSettingsType,
   VideoOrientation,
+  LifecycleEventData,
 } from './types';
 
 const RTMPModule = NativeModules.RTMPPublisher;
@@ -62,6 +68,16 @@ export interface RTMPPublisherProps {
    * Callback for bluetooth device connection changes
    */
   onBluetoothDeviceStatusChanged?: (data: BluetoothDeviceStatuses) => void;
+  /**
+   * Callback when app goes to background (Android only)
+   * Includes wasStreaming boolean to indicate if stream was active
+   */
+  onAppBackgrounded?: (data: LifecycleEventData) => void;
+  /**
+   * Callback when app returns to foreground (Android only)
+   * Includes wasStreaming boolean to indicate if stream was active before backgrounding
+   */
+  onAppForegrounded?: (data: LifecycleEventData) => void;
 }
 
 const RTMPPublisher = forwardRef<RTMPPublisherRefProps, RTMPPublisherProps>(
@@ -74,10 +90,48 @@ const RTMPPublisher = forwardRef<RTMPPublisherRefProps, RTMPPublisherProps>(
       onNewBitrateReceived,
       onStreamStateChanged,
       onBluetoothDeviceStatusChanged,
+      onAppBackgrounded,
+      onAppForegrounded,
       ...props
     },
     ref
   ) => {
+    // Subscribe to lifecycle events from native module (Android only)
+    useEffect(() => {
+      if (Platform.OS !== 'android') {
+        return;
+      }
+
+      const eventEmitter = new NativeEventEmitter(RTMPModule);
+      const subscriptions: Array<ReturnType<typeof eventEmitter.addListener>> =
+        [];
+
+      if (onAppBackgrounded) {
+        subscriptions.push(
+          eventEmitter.addListener(
+            'onAppBackgrounded',
+            (event: LifecycleEventData) => {
+              onAppBackgrounded(event);
+            }
+          )
+        );
+      }
+
+      if (onAppForegrounded) {
+        subscriptions.push(
+          eventEmitter.addListener(
+            'onAppForegrounded',
+            (event: LifecycleEventData) => {
+              onAppForegrounded(event);
+            }
+          )
+        );
+      }
+
+      return () => {
+        subscriptions.forEach((subscription) => subscription.remove());
+      };
+    }, [onAppBackgrounded, onAppForegrounded]);
     const startStream = async () => await RTMPModule.startStream();
 
     const stopStream = async () => await RTMPModule.stopStream();

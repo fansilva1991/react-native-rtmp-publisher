@@ -1,20 +1,78 @@
 package com.reactnativertmppublisher;
 
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.reactnativertmppublisher.enums.AudioInputType;
 
-public class RTMPModule extends ReactContextBaseJavaModule {
+public class RTMPModule extends ReactContextBaseJavaModule implements LifecycleEventListener {
+  private static final String TAG = "RTMPModule";
   private final String REACT_MODULE_NAME = "RTMPPublisher";
+  private final ReactApplicationContext _reactContext;
+  private boolean _wasStreaming = false;
 
   public RTMPModule(@Nullable ReactApplicationContext reactContext) {
     super(reactContext);
+    _reactContext = reactContext;
+    if (reactContext != null) {
+      reactContext.addLifecycleEventListener(this);
+    }
+  }
+
+  @Override
+  public void onHostResume() {
+    Log.d(TAG, "onHostResume");
+    if (RTMPManager.publisher != null) {
+      RTMPManager.publisher.handleResume();
+
+      // Emit event to JS with wasStreaming info
+      WritableMap params = Arguments.createMap();
+      params.putBoolean("wasStreaming", _wasStreaming);
+      sendEvent("onAppForegrounded", params);
+    }
+  }
+
+  @Override
+  public void onHostPause() {
+    Log.d(TAG, "onHostPause");
+    if (RTMPManager.publisher != null) {
+      _wasStreaming = RTMPManager.publisher.handlePause();
+
+      // Emit event to JS
+      WritableMap params = Arguments.createMap();
+      params.putBoolean("wasStreaming", _wasStreaming);
+      sendEvent("onAppBackgrounded", params);
+    }
+  }
+
+  @Override
+  public void onHostDestroy() {
+    Log.d(TAG, "onHostDestroy");
+    if (RTMPManager.publisher != null) {
+      RTMPManager.publisher.handleDestroy();
+    }
+    if (_reactContext != null) {
+      _reactContext.removeLifecycleEventListener(this);
+    }
+  }
+
+  private void sendEvent(String eventName, @Nullable WritableMap params) {
+    if (_reactContext != null && _reactContext.hasActiveReactInstance()) {
+      _reactContext
+        .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+        .emit(eventName, params);
+    }
   }
 
   @NonNull

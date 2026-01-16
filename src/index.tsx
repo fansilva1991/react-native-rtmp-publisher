@@ -6,4 +6,5 @@ export {
   StreamStatus,
   AudioInputType,
   BluetoothDeviceStatuses,
+  LifecycleEventData,
 } from './types';

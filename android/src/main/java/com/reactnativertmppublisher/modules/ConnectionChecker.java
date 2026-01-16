@@ -15,6 +15,10 @@ public class ConnectionChecker implements ConnectCheckerRtmp {
     listeners.add(listener);
   }
 
+  public void clearListeners() {
+    listeners.clear();
+  }
+
   @Override
   public void onAuthErrorRtmp() {
     for (ConnectionListener l : listeners) {
