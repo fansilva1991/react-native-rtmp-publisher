@@ -67,6 +67,15 @@ class RTMPCreator {
         }
     }
 
+    /// Performs capture configuration with DispatchGroup coordination.
+    public static func performCaptureConfiguration(group: DispatchGroup, _ block: @escaping () -> Void) {
+        group.enter()
+        captureQueue.async {
+            block()
+            group.leave()
+        }
+    }
+
     public static func setVideoSettings(_ newVideoSettings: VideoSettingsType) {
         videoSettings = newVideoSettings
         performCaptureConfiguration {

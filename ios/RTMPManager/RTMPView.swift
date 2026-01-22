@@ -15,6 +15,7 @@ class RTMPView: UIView {
   private var pendingAudioUpdateAttempts = 0
   private let maxAudioUpdateAttempts = 10
   private var hasAppliedInitialSettings = false
+  private var hasAttachedStream = false
   @objc var onDisconnect: RCTDirectEventBlock?
   @objc var onConnectionFailed: RCTDirectEventBlock?
   @objc var onConnectionStarted: RCTDirectEventBlock?
@@ -35,6 +36,7 @@ class RTMPView: UIView {
   }
   @objc var enableAudio: Bool = true {
     didSet {
+      guard hasAttachedStream else { return }
       updateAudioAttachment()
     }
   }
@@ -49,6 +51,7 @@ class RTMPView: UIView {
       ]
   ){
     didSet {
+        guard hasAttachedStream else { return }
         applyVideoSettings()
     }
   }
@@ -71,6 +74,7 @@ class RTMPView: UIView {
 
   @objc var videoOrientation: NSString = "portrait" {
     didSet {
+      guard hasAttachedStream else { return }
       applyVideoOrientation()
     }
   }
@@ -93,7 +97,10 @@ class RTMPView: UIView {
     }
 
     // Detach view from stream (critical - prevents crash)
-    hkView.attachStream(nil)
+    if hasAttachedStream {
+      hkView.attachStream(nil)
+      hasAttachedStream = false
+    }
 
     // Remove event listener
     RTMPCreator.connection.removeEventListener(.rtmpStatus, selector: #selector(statusHandler), observer: self)
@@ -177,39 +184,86 @@ class RTMPView: UIView {
     hkView = MTHKView(frame: UIScreen.main.bounds)
     hkView.videoGravity = .resizeAspectFill
 
-    // Only set up capture settings that don't depend on props
-    // fps is applied later via applyVideoSettings() after props are set
-    RTMPCreator.performCaptureConfiguration {
-      RTMPCreator.stream.captureSettings = [
-          .continuousAutofocus: true,
-          .continuousExposure: true
-      ]
-    }
-
-    updateAudioAttachment()
-    RTMPCreator.performCaptureConfiguration {
-      RTMPCreator.stream.attachCamera(DeviceUtil.device(withPosition: AVCaptureDevice.Position.back))
-    }
-
     RTMPCreator.connection.addEventListener(.rtmpStatus, selector: #selector(statusHandler), observer: self)
-
-    hkView.attachStream(RTMPCreator.stream)
 
     self.addSubview(hkView)
   }
 
   override func layoutSubviews() {
     super.layoutSubviews()
+    hkView.frame = self.bounds
 
-    // Apply initial settings after props have been set by React Native
     if !hasAppliedInitialSettings {
       hasAppliedInitialSettings = true
-      applyVideoSettings()
-      applyVideoOrientation()
+      performInitialSetup()
+    }
+  }
+
+  private func performInitialSetup() {
+    let configGroup = DispatchGroup()
+
+    // Configure basic capture settings
+    RTMPCreator.performCaptureConfiguration(group: configGroup) {
+      RTMPCreator.stream.captureSettings = [
+        .continuousAutofocus: true,
+        .continuousExposure: true
+      ]
     }
 
-    // Update hkView frame to match this view's bounds
-    hkView.frame = self.bounds
+    // Apply video settings from props
+    let width = videoSettings["width"] as? Int ?? 720
+    let height = videoSettings["height"] as? Int ?? 1280
+    let bitrate = videoSettings["bitrate"] as? Int ?? (3000 * 1000)
+    let audioBitrate = videoSettings["audioBitrate"] as? Int ?? (128 * 1000)
+    let fps = videoSettings["fps"] as? Int ?? 30
+    let preset = selectCapturePreset(for: width, height: height)
+
+    RTMPCreator.performCaptureConfiguration(group: configGroup) {
+      RTMPCreator.stream.captureSettings[.sessionPreset] = preset
+      RTMPCreator.stream.captureSettings[.fps] = fps
+
+      RTMPCreator.stream.videoSettings = [
+        .width: width,
+        .height: height,
+        .bitrate: bitrate,
+        .scalingMode: ScalingMode.cropSourceToCleanAperture,
+        .profileLevel: kVTProfileLevel_H264_High_AutoLevel
+      ]
+
+      RTMPCreator.stream.audioSettings = [
+        .bitrate: audioBitrate
+      ]
+    }
+
+    // Apply video orientation
+    RTMPCreator.performCaptureConfiguration(group: configGroup) {
+      switch self.videoOrientation {
+      case "landscape":
+        RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.landscapeRight
+      default:
+        RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.portrait
+      }
+    }
+
+    // Configure audio
+    configureAudioSession()
+    if enableAudio {
+      RTMPCreator.performCaptureConfiguration(group: configGroup) {
+        RTMPCreator.stream.attachAudio(AVCaptureDevice.default(for: .audio))
+      }
+    }
+
+    // Attach camera
+    RTMPCreator.performCaptureConfiguration(group: configGroup) {
+      RTMPCreator.stream.attachCamera(DeviceUtil.device(withPosition: AVCaptureDevice.Position.back))
+    }
+
+    // CRITICAL: Attach stream only AFTER all configuration completes
+    configGroup.notify(queue: .main) { [weak self] in
+      guard let self = self else { return }
+      self.hkView.attachStream(RTMPCreator.stream)
+      self.hasAttachedStream = true
+    }
   }
     
     required init?(coder aDecoder: NSCoder) {
