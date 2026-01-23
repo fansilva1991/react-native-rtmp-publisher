@@ -202,7 +202,7 @@ class RTMPView: UIView {
   private func performInitialSetup() {
     let configGroup = DispatchGroup()
 
-    // Configure basic capture settings
+    // Configure basic capture settings (NOT encoding settings)
     RTMPCreator.performCaptureConfiguration(group: configGroup) {
       RTMPCreator.stream.captureSettings = [
         .continuousAutofocus: true,
@@ -210,42 +210,7 @@ class RTMPView: UIView {
       ]
     }
 
-    // Apply video settings from props
-    let width = videoSettings["width"] as? Int ?? 720
-    let height = videoSettings["height"] as? Int ?? 1280
-    let bitrate = videoSettings["bitrate"] as? Int ?? (3000 * 1000)
-    let audioBitrate = videoSettings["audioBitrate"] as? Int ?? (128 * 1000)
-    let fps = videoSettings["fps"] as? Int ?? 30
-    let preset = selectCapturePreset(for: width, height: height)
-
-    RTMPCreator.performCaptureConfiguration(group: configGroup) {
-      RTMPCreator.stream.captureSettings[.sessionPreset] = preset
-      RTMPCreator.stream.captureSettings[.fps] = fps
-
-      RTMPCreator.stream.videoSettings = [
-        .width: width,
-        .height: height,
-        .bitrate: bitrate,
-        .scalingMode: ScalingMode.cropSourceToCleanAperture,
-        .profileLevel: kVTProfileLevel_H264_High_AutoLevel
-      ]
-
-      RTMPCreator.stream.audioSettings = [
-        .bitrate: audioBitrate
-      ]
-    }
-
-    // Apply video orientation
-    RTMPCreator.performCaptureConfiguration(group: configGroup) {
-      switch self.videoOrientation {
-      case "landscape":
-        RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.landscapeRight
-      default:
-        RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.portrait
-      }
-    }
-
-    // Configure audio
+    // Configure audio session and attach audio
     configureAudioSession()
     if enableAudio {
       RTMPCreator.performCaptureConfiguration(group: configGroup) {
@@ -258,11 +223,15 @@ class RTMPView: UIView {
       RTMPCreator.stream.attachCamera(DeviceUtil.device(withPosition: AVCaptureDevice.Position.back))
     }
 
-    // CRITICAL: Attach stream only AFTER all configuration completes
+    // CRITICAL: Attach stream AFTER camera/audio attached, but BEFORE encoding settings
     configGroup.notify(queue: .main) { [weak self] in
       guard let self = self else { return }
       self.hkView.attachStream(RTMPCreator.stream)
       self.hasAttachedStream = true
+
+      // Apply encoding settings AFTER stream is attached (like old code)
+      self.applyVideoSettings()
+      self.applyVideoOrientation()
     }
   }
     
