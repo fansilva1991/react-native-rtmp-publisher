@@ -223,15 +223,53 @@ class RTMPView: UIView {
       RTMPCreator.stream.attachCamera(DeviceUtil.device(withPosition: AVCaptureDevice.Position.back))
     }
 
-    // CRITICAL: Attach stream AFTER camera/audio attached, but BEFORE encoding settings
+    // After camera/audio attached, apply encoding settings on capture queue
     configGroup.notify(queue: .main) { [weak self] in
       guard let self = self else { return }
-      self.hkView.attachStream(RTMPCreator.stream)
-      self.hasAttachedStream = true
 
-      // Apply encoding settings AFTER stream is attached (like old code)
-      self.applyVideoSettings()
-      self.applyVideoOrientation()
+      let settingsGroup = DispatchGroup()
+
+      // Apply video encoding settings on capture queue
+      let width = self.videoSettings["width"] as? Int ?? 720
+      let height = self.videoSettings["height"] as? Int ?? 1280
+      let bitrate = self.videoSettings["bitrate"] as? Int ?? (3000 * 1000)
+      let audioBitrate = self.videoSettings["audioBitrate"] as? Int ?? (128 * 1000)
+      let fps = self.videoSettings["fps"] as? Int ?? 30
+      let preset = self.selectCapturePreset(for: width, height: height)
+      let orientation = self.videoOrientation
+
+      RTMPCreator.performCaptureConfiguration(group: settingsGroup) {
+        RTMPCreator.stream.captureSettings[.sessionPreset] = preset
+        RTMPCreator.stream.captureSettings[.fps] = fps
+
+        RTMPCreator.stream.videoSettings = [
+          .width: width,
+          .height: height,
+          .bitrate: bitrate,
+          .scalingMode: ScalingMode.cropSourceToCleanAperture,
+          .profileLevel: kVTProfileLevel_H264_High_AutoLevel
+        ]
+
+        RTMPCreator.stream.audioSettings = [
+          .bitrate: audioBitrate
+        ]
+
+        switch orientation {
+        case "landscape":
+          RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.landscapeRight
+        default:
+          RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.portrait
+        }
+      }
+
+      // CRITICAL: Attach stream AFTER all configuration is complete.
+      // attachStream triggers AVCaptureSession.startRunning(), which crashes
+      // if called between beginConfiguration and commitConfiguration.
+      settingsGroup.notify(queue: .main) { [weak self] in
+        guard let self = self else { return }
+        self.hkView.attachStream(RTMPCreator.stream)
+        self.hasAttachedStream = true
+      }
     }
   }
     
