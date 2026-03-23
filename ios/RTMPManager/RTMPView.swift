@@ -18,6 +18,7 @@ class RTMPView: UIView {
   private var hasAttachedStream = false
   private var connectionStatusTask: Task<Void, Never>?
   private var streamStatusTask: Task<Void, Never>?
+  private var hasCleanedUp = false
 
   @objc var onDisconnect: RCTDirectEventBlock?
   @objc var onConnectionFailed: RCTDirectEventBlock?
@@ -94,6 +95,9 @@ class RTMPView: UIView {
   }
 
   private func cleanup() {
+    guard !hasCleanedUp else { return }
+    hasCleanedUp = true
+
     // Stop streaming if active
     if RTMPCreator.isStreaming {
       RTMPCreator.stopPublish()
@@ -105,11 +109,14 @@ class RTMPView: UIView {
     streamStatusTask?.cancel()
     streamStatusTask = nil
 
+    // Capture view reference before potential deallocation
+    let view = hkView!
+
     // Detach view from mixer and stream
     if hasAttachedStream {
       Task {
-        await RTMPCreator.mixer.removeOutput(hkView)
-        await RTMPCreator.stream.removeOutput(hkView)
+        await RTMPCreator.mixer.removeOutput(view)
+        await RTMPCreator.stream.removeOutput(view)
       }
       hasAttachedStream = false
     }
@@ -118,6 +125,10 @@ class RTMPView: UIView {
     Task {
       try? await RTMPCreator.mixer.attachVideo(nil)
       try? await RTMPCreator.mixer.attachAudio(nil)
+      await MainActor.run {
+        RTMPCreator.isVideoAttached = false
+        RTMPCreator.isAudioAttached = false
+      }
     }
 
     // Re-enable idle timer
@@ -223,9 +234,6 @@ class RTMPView: UIView {
     case RTMPConnection.Code.connectSuccess.rawValue:
       onConnectionSuccess?(nil)
       changeStreamState(status: "CONNECTING")
-      Task {
-        let _ = try? await RTMPCreator.stream.publish(streamName as String)
-      }
 
     case RTMPConnection.Code.connectFailed.rawValue:
       onConnectionFailed?(nil)
@@ -275,11 +283,13 @@ class RTMPView: UIView {
       configureAudioSession()
       if enableAudio {
         try? await RTMPCreator.mixer.attachAudio(AVCaptureDevice.default(for: .audio))
+        await MainActor.run { RTMPCreator.isAudioAttached = true }
       }
 
       // Attach camera
       let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
       try? await RTMPCreator.mixer.attachVideo(camera)
+      await MainActor.run { RTMPCreator.isVideoAttached = true }
 
       // Apply capture settings
       await RTMPCreator.mixer.setSessionPreset(preset)

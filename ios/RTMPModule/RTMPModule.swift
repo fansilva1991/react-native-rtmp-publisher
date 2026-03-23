@@ -9,20 +9,19 @@ import AudioToolbox
 import AVFoundation
 import HaishinKit
 
+@MainActor
 @objc(RTMPPublisher)
 class RTMPModule: NSObject {
     private var cameraPosition: AVCaptureDevice.Position = .back
 
     @objc
     func startStream(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock){
-        RTMPCreator.startPublish()
-        resolve(nil)
+        RTMPCreator.startPublish(resolve: resolve, reject: reject)
     }
 
     @objc
     func stopStream(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock){
-        RTMPCreator.stopPublish()
-        resolve(nil)
+        RTMPCreator.stopPublish(resolve: resolve, reject: reject)
     }
 
     @objc
@@ -74,14 +73,12 @@ class RTMPModule: NSObject {
 
     @objc
     func isAudioPrepared(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock){
-        // In v2.0.9, receiveAudio is a method not a property.
-        // Report based on whether audio device is attached (enableAudio state).
-        resolve(true)
+        resolve(RTMPCreator.isAudioAttached)
     }
 
     @objc
     func isVideoPrepared(_ resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock){
-        resolve(true)
+        resolve(RTMPCreator.isVideoAttached)
     }
 
     @objc

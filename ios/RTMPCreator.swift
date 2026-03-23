@@ -17,6 +17,7 @@ struct VideoSettingsType {
     var fps: Int
 }
 
+@MainActor
 class RTMPCreator {
     public static let connection: RTMPConnection = RTMPConnection()
     public static let stream: RTMPStream = RTMPStream(connection: connection)
@@ -27,6 +28,8 @@ class RTMPCreator {
     public static var isStreaming: Bool = false
     public static var isMuted: Bool = false
     public static var isTorchEnabled: Bool = false
+    public static var isAudioAttached: Bool = false
+    public static var isVideoAttached: Bool = false
     public static var videoSettings: VideoSettingsType = VideoSettingsType(
         width: 720,
         height: 1280,
@@ -47,13 +50,16 @@ class RTMPCreator {
         return "\(_streamUrl)/\(_streamName)"
     }
 
-    public static func startPublish(){
+    public static func startPublish(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock){
         Task {
             do {
-                let _ = try await connection.connect(_streamUrl)
+                _ = try await connection.connect(_streamUrl)
+                _ = try await stream.publish(_streamName)
                 isStreaming = true
+                resolve(nil)
             } catch {
-                NSLog("RTMPCreator: connect failed: %@", error.localizedDescription)
+                NSLog("RTMPCreator: publish failed: %@", error.localizedDescription)
+                reject("STREAM_ERROR", "Failed to start stream: \(error.localizedDescription)", error)
             }
         }
     }
@@ -76,10 +82,23 @@ class RTMPCreator {
         }
     }
 
+    public static func stopPublish(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock){
+        Task {
+            do {
+                _ = try await stream.close()
+                try await connection.close()
+            } catch {
+                NSLog("RTMPCreator: stop failed: %@", error.localizedDescription)
+            }
+            isStreaming = false
+            resolve(nil)
+        }
+    }
+
     public static func stopPublish(){
         Task {
             do {
-                let _ = try await stream.close()
+                _ = try await stream.close()
                 try await connection.close()
             } catch {
                 NSLog("RTMPCreator: stop failed: %@", error.localizedDescription)
