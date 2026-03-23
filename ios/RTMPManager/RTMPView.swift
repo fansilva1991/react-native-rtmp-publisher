@@ -16,24 +16,28 @@ class RTMPView: UIView {
   private let maxAudioUpdateAttempts = 10
   private var hasAppliedInitialSettings = false
   private var hasAttachedStream = false
+  private var connectionStatusTask: Task<Void, Never>?
+  private var streamStatusTask: Task<Void, Never>?
+
   @objc var onDisconnect: RCTDirectEventBlock?
   @objc var onConnectionFailed: RCTDirectEventBlock?
   @objc var onConnectionStarted: RCTDirectEventBlock?
   @objc var onConnectionSuccess: RCTDirectEventBlock?
   @objc var onNewBitrateReceived: RCTDirectEventBlock?
   @objc var onStreamStateChanged: RCTDirectEventBlock?
-  
+
   @objc var streamURL: NSString = "" {
     didSet {
       RTMPCreator.setStreamUrl(url: streamURL as String)
     }
   }
-  
+
   @objc var streamName: NSString = "" {
     didSet {
       RTMPCreator.setStreamName(name: streamName as String)
     }
   }
+
   @objc var enableAudio: Bool = true {
     didSet {
       guard hasAttachedStream else { return }
@@ -63,10 +67,9 @@ class RTMPView: UIView {
       let audioBitrate = videoSettings["audioBitrate"] as? Int ?? (128 * 1000)
       let fps = videoSettings["fps"] as? Int ?? 30
 
-      // Update capture preset to match output resolution
       let preset = selectCapturePreset(for: width, height: height)
-      RTMPCreator.performCaptureConfiguration {
-        RTMPCreator.stream.captureSettings[.sessionPreset] = preset
+      Task {
+        await RTMPCreator.mixer.setSessionPreset(preset)
       }
 
       RTMPCreator.setVideoSettings(VideoSettingsType(width: width, height: height, bitrate: bitrate, audioBitrate: audioBitrate, fps: fps))
@@ -80,12 +83,12 @@ class RTMPView: UIView {
   }
 
   private func applyVideoOrientation() {
-    RTMPCreator.performCaptureConfiguration {
+    Task {
       switch self.videoOrientation {
       case "landscape":
-        RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.landscapeRight
+        await RTMPCreator.mixer.setVideoOrientation(AVCaptureVideoOrientation.landscapeRight)
       default:
-        RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.portrait
+        await RTMPCreator.mixer.setVideoOrientation(AVCaptureVideoOrientation.portrait)
       }
     }
   }
@@ -96,19 +99,25 @@ class RTMPView: UIView {
       RTMPCreator.stopPublish()
     }
 
-    // Detach view from stream (critical - prevents crash)
+    // Cancel status listeners
+    connectionStatusTask?.cancel()
+    connectionStatusTask = nil
+    streamStatusTask?.cancel()
+    streamStatusTask = nil
+
+    // Detach view from mixer and stream
     if hasAttachedStream {
-      hkView.attachStream(nil)
+      Task {
+        await RTMPCreator.mixer.removeOutput(hkView)
+        await RTMPCreator.stream.removeOutput(hkView)
+      }
       hasAttachedStream = false
     }
 
-    // Remove event listener
-    RTMPCreator.connection.removeEventListener(.rtmpStatus, selector: #selector(statusHandler), observer: self)
-
     // Detach camera and audio
-    RTMPCreator.performCaptureConfiguration {
-      RTMPCreator.stream.attachCamera(nil)
-      RTMPCreator.stream.attachAudio(nil)
+    Task {
+      try? await RTMPCreator.mixer.attachVideo(nil)
+      try? await RTMPCreator.mixer.attachAudio(nil)
     }
 
     // Re-enable idle timer
@@ -156,12 +165,12 @@ class RTMPView: UIView {
     pendingAudioUpdateAttempts = 0
     if enableAudio {
       configureAudioSession()
-      RTMPCreator.performCaptureConfiguration {
-        RTMPCreator.stream.attachAudio(AVCaptureDevice.default(for: .audio))
+      Task {
+        try? await RTMPCreator.mixer.attachAudio(AVCaptureDevice.default(for: .audio))
       }
     } else {
-      RTMPCreator.performCaptureConfiguration {
-        RTMPCreator.stream.attachAudio(nil)
+      Task {
+        try? await RTMPCreator.mixer.attachAudio(nil)
       }
     }
   }
@@ -184,9 +193,62 @@ class RTMPView: UIView {
     hkView = MTHKView(frame: UIScreen.main.bounds)
     hkView.videoGravity = .resizeAspectFill
 
-    RTMPCreator.connection.addEventListener(.rtmpStatus, selector: #selector(statusHandler), observer: self)
+    startListeningForStatus()
 
     self.addSubview(hkView)
+  }
+
+  private func startListeningForStatus() {
+    connectionStatusTask = Task { [weak self] in
+      for await status in await RTMPCreator.connection.status {
+        guard let self = self else { break }
+        await MainActor.run {
+          self.handleConnectionStatus(status)
+        }
+      }
+    }
+
+    streamStatusTask = Task { [weak self] in
+      for await status in await RTMPCreator.stream.status {
+        guard let self = self else { break }
+        await MainActor.run {
+          self.handleStreamStatus(status)
+        }
+      }
+    }
+  }
+
+  private func handleConnectionStatus(_ status: RTMPStatus) {
+    switch status.code {
+    case RTMPConnection.Code.connectSuccess.rawValue:
+      onConnectionSuccess?(nil)
+      changeStreamState(status: "CONNECTING")
+      Task {
+        let _ = try? await RTMPCreator.stream.publish(streamName as String)
+      }
+
+    case RTMPConnection.Code.connectFailed.rawValue:
+      onConnectionFailed?(nil)
+      changeStreamState(status: "FAILED")
+
+    case RTMPConnection.Code.connectClosed.rawValue:
+      onDisconnect?(nil)
+      changeStreamState(status: "CLOSED")
+
+    default:
+      break
+    }
+  }
+
+  private func handleStreamStatus(_ status: RTMPStatus) {
+    switch status.code {
+    case RTMPStream.Code.publishStart.rawValue:
+      onConnectionStarted?(nil)
+      changeStreamState(status: "CONNECTED")
+
+    default:
+      break
+    }
   }
 
   override func layoutSubviews() {
@@ -200,83 +262,65 @@ class RTMPView: UIView {
   }
 
   private func performInitialSetup() {
-    let configGroup = DispatchGroup()
+    let width = videoSettings["width"] as? Int ?? 720
+    let height = videoSettings["height"] as? Int ?? 1280
+    let bitrate = videoSettings["bitrate"] as? Int ?? (3000 * 1000)
+    let audioBitrate = videoSettings["audioBitrate"] as? Int ?? (128 * 1000)
+    let fps = videoSettings["fps"] as? Int ?? 30
+    let preset = selectCapturePreset(for: width, height: height)
+    let orientation = videoOrientation
 
-    // Configure basic capture settings (NOT encoding settings)
-    RTMPCreator.performCaptureConfiguration(group: configGroup) {
-      RTMPCreator.stream.captureSettings = [
-        .continuousAutofocus: true,
-        .continuousExposure: true
-      ]
-    }
-
-    // Configure audio session and attach audio
-    configureAudioSession()
-    if enableAudio {
-      RTMPCreator.performCaptureConfiguration(group: configGroup) {
-        RTMPCreator.stream.attachAudio(AVCaptureDevice.default(for: .audio))
-      }
-    }
-
-    // Attach camera
-    RTMPCreator.performCaptureConfiguration(group: configGroup) {
-      RTMPCreator.stream.attachCamera(DeviceUtil.device(withPosition: AVCaptureDevice.Position.back))
-    }
-
-    // After camera/audio attached, apply encoding settings on capture queue
-    configGroup.notify(queue: .main) { [weak self] in
-      guard let self = self else { return }
-
-      let settingsGroup = DispatchGroup()
-
-      // Apply video encoding settings on capture queue
-      let width = self.videoSettings["width"] as? Int ?? 720
-      let height = self.videoSettings["height"] as? Int ?? 1280
-      let bitrate = self.videoSettings["bitrate"] as? Int ?? (3000 * 1000)
-      let audioBitrate = self.videoSettings["audioBitrate"] as? Int ?? (128 * 1000)
-      let fps = self.videoSettings["fps"] as? Int ?? 30
-      let preset = self.selectCapturePreset(for: width, height: height)
-      let orientation = self.videoOrientation
-
-      RTMPCreator.performCaptureConfiguration(group: settingsGroup) {
-        RTMPCreator.stream.captureSettings[.sessionPreset] = preset
-        RTMPCreator.stream.captureSettings[.fps] = fps
-
-        RTMPCreator.stream.videoSettings = [
-          .width: width,
-          .height: height,
-          .bitrate: bitrate,
-          .scalingMode: ScalingMode.cropSourceToCleanAperture,
-          .profileLevel: kVTProfileLevel_H264_High_AutoLevel
-        ]
-
-        RTMPCreator.stream.audioSettings = [
-          .bitrate: audioBitrate
-        ]
-
-        switch orientation {
-        case "landscape":
-          RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.landscapeRight
-        default:
-          RTMPCreator.stream.videoOrientation = AVCaptureVideoOrientation.portrait
-        }
+    Task {
+      // Configure audio session and attach audio
+      configureAudioSession()
+      if enableAudio {
+        try? await RTMPCreator.mixer.attachAudio(AVCaptureDevice.default(for: .audio))
       }
 
-      // CRITICAL: Attach stream AFTER all configuration is complete.
-      // attachStream triggers AVCaptureSession.startRunning(), which crashes
-      // if called between beginConfiguration and commitConfiguration.
-      settingsGroup.notify(queue: .main) { [weak self] in
-        guard let self = self else { return }
-        self.hkView.attachStream(RTMPCreator.stream)
-        self.hasAttachedStream = true
+      // Attach camera
+      let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+      try? await RTMPCreator.mixer.attachVideo(camera)
+
+      // Apply capture settings
+      await RTMPCreator.mixer.setSessionPreset(preset)
+      await RTMPCreator.mixer.setFrameRate(Float64(fps))
+
+      // Apply video orientation
+      switch orientation {
+      case "landscape":
+        await RTMPCreator.mixer.setVideoOrientation(.landscapeRight)
+      default:
+        await RTMPCreator.mixer.setVideoOrientation(.portrait)
+      }
+
+      // Apply encoding settings
+      await RTMPCreator.stream.setVideoSettings(VideoCodecSettings(
+        videoSize: CGSize(width: width, height: height),
+        bitRate: bitrate,
+        profileLevel: kVTProfileLevel_H264_High_AutoLevel as String,
+        scalingMode: .cropSourceToCleanAperture
+      ))
+
+      await RTMPCreator.stream.setAudioSettings(AudioCodecSettings(
+        bitRate: audioBitrate
+      ))
+
+      // Connect mixer to stream (mixer feeds encoded data to stream)
+      await RTMPCreator.mixer.addOutput(RTMPCreator.stream)
+
+      // Connect stream to view (stream feeds video to preview)
+      await RTMPCreator.stream.addOutput(hkView)
+
+      await MainActor.run { [weak self] in
+        self?.hasAttachedStream = true
       }
     }
   }
-    
+
     required init?(coder aDecoder: NSCoder) {
        fatalError("init(coder:) has not been implemented")
      }
-    
+
     override func removeFromSuperview() {
         cleanup()
         super.removeFromSuperview()
@@ -284,48 +328,6 @@ class RTMPView: UIView {
 
     deinit {
         cleanup()
-    }
-  
-    @objc
-    private func statusHandler(_ notification: Notification){
-      let e = Event.from(notification)
-       guard let data: ASObject = e.data as? ASObject, let code: String = data["code"] as? String else {
-           return
-       }
-    
-       switch code {
-       case RTMPConnection.Code.connectSuccess.rawValue:
-         if onConnectionSuccess != nil {
-              onConnectionSuccess!(nil)
-            }
-           changeStreamState(status: "CONNECTING")
-           RTMPCreator.stream.publish(streamName as String)
-           break
-       
-       case RTMPConnection.Code.connectFailed.rawValue:
-         if onConnectionFailed != nil {
-              onConnectionFailed!(nil)
-            }
-           changeStreamState(status: "FAILED")
-           break
-         
-       case RTMPConnection.Code.connectClosed.rawValue:
-         if onDisconnect != nil {
-              onDisconnect!(nil)
-            }
-           changeStreamState(status: "CLOSED")
-           break
-         
-       case RTMPStream.Code.publishStart.rawValue:
-         if onConnectionStarted != nil {
-              onConnectionStarted!(nil)
-            }
-           changeStreamState(status: "CONNECTED")
-           break
-         
-       default:
-           break
-       }
     }
 
     public func changeStreamState(status: String){
