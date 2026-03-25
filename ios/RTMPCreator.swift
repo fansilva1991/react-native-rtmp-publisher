@@ -17,14 +17,19 @@ struct VideoSettingsType {
     var fps: Int
 }
 
+@MainActor
 class RTMPCreator {
     public static let connection: RTMPConnection = RTMPConnection()
     public static let stream: RTMPStream = RTMPStream(connection: connection)
-    private static let captureQueue = DispatchQueue(label: "com.sportninja.rtmp.capture")
+    public static let mixer: MediaMixer = MediaMixer()
     private static let session = AVAudioSession.sharedInstance()
     private static var _streamUrl: String = ""
     private static var _streamName: String = ""
     public static var isStreaming: Bool = false
+    public static var isMuted: Bool = false
+    public static var isTorchEnabled: Bool = false
+    public static var isAudioAttached: Bool = false
+    public static var isVideoAttached: Bool = false
     public static var videoSettings: VideoSettingsType = VideoSettingsType(
         width: 720,
         height: 1280,
@@ -41,104 +46,94 @@ class RTMPCreator {
         _streamName = name
     }
 
-  
     public static func getPublishURL() -> String {
-    // TODO: Object formatına dönüştürülebilir
-    /**
-      {
-        streamName: _streamName
-        streamUrl: _streamUrl
-      }
-     */
-    return "\(_streamUrl)/\(_streamName)"
-    }
-  
-    public static func startPublish(){
-        performCaptureConfiguration {
-            connection.requireNetworkFramework = true
-            connection.connect(_streamUrl)
-            isStreaming = true
-        }
+        return "\(_streamUrl)/\(_streamName)"
     }
 
-    public static func performCaptureConfiguration(_ block: @escaping () -> Void) {
-        captureQueue.async {
-            block()
-        }
-    }
-
-    /// Performs capture configuration with DispatchGroup coordination.
-    public static func performCaptureConfiguration(group: DispatchGroup, _ block: @escaping () -> Void) {
-        group.enter()
-        captureQueue.async {
-            block()
-            group.leave()
+    public static func startPublish(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock){
+        Task {
+            do {
+                _ = try await connection.connect(_streamUrl)
+                _ = try await stream.publish(_streamName)
+                isStreaming = true
+                resolve(nil)
+            } catch {
+                NSLog("RTMPCreator: publish failed: %@", error.localizedDescription)
+                reject("STREAM_ERROR", "Failed to start stream: \(error.localizedDescription)", error)
+            }
         }
     }
 
     public static func setVideoSettings(_ newVideoSettings: VideoSettingsType) {
         videoSettings = newVideoSettings
-        performCaptureConfiguration {
-            stream.captureSettings[.fps] = videoSettings.fps
+        Task {
+            await mixer.setFrameRate(Float64(videoSettings.fps))
 
-            stream.videoSettings = [
-                .width: videoSettings.width,
-                .height: videoSettings.height,
-                .bitrate: videoSettings.bitrate,
-                .scalingMode: ScalingMode.cropSourceToCleanAperture,
-                .profileLevel: kVTProfileLevel_H264_High_AutoLevel
-            ]
+            await stream.setVideoSettings(VideoCodecSettings(
+                videoSize: CGSize(width: videoSettings.width, height: videoSettings.height),
+                bitRate: videoSettings.bitrate,
+                profileLevel: kVTProfileLevel_H264_High_AutoLevel as String,
+                scalingMode: .cropSourceToCleanAperture
+            ))
 
-            stream.audioSettings = [
-                .bitrate: videoSettings.audioBitrate
-            ]
+            await stream.setAudioSettings(AudioCodecSettings(
+                bitRate: videoSettings.audioBitrate
+            ))
+        }
+    }
+
+    public static func stopPublish(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock){
+        Task {
+            do {
+                _ = try await stream.close()
+                try await connection.close()
+            } catch {
+                NSLog("RTMPCreator: stop failed: %@", error.localizedDescription)
+            }
+            isStreaming = false
+            resolve(nil)
         }
     }
 
     public static func stopPublish(){
-        performCaptureConfiguration {
-            stream.close()
-            connection.close()
+        Task {
+            do {
+                _ = try await stream.close()
+                try await connection.close()
+            } catch {
+                NSLog("RTMPCreator: stop failed: %@", error.localizedDescription)
+            }
             isStreaming = false
         }
     }
-    
+
     public static func setAudioInput(audioInput: Int){
-        performCaptureConfiguration {
-            switch audioInput {
-            case 0:
-                switchToBluetooth()
-                break;
-
-            case 1:
-                switchToSpeaker()
-                break;
-
-            case 2:
-                switchToHeadset()
-                break;
-
-            default:
-                return
-            }
+        switch audioInput {
+        case 0:
+            switchToBluetooth()
+        case 1:
+            switchToSpeaker()
+        case 2:
+            switchToHeadset()
+        default:
+            return
         }
     }
-    
+
     private static func switchToSpeaker(){
         guard let inputs = session.availableInputs, !inputs.isEmpty else {
             NSLog("RTMPCreator: No available audio inputs for speaker switch.")
             return
         }
-        
+
         if let selectedDesc = inputs.first(where: { (desc) -> Bool in
             return desc.portType == AVAudioSession.Port.builtInMic
         }){
             do{
-                
                 let selectedDataSource = selectedDesc.dataSources?.first(where: { (source) -> Bool in
                     return source.orientation == AVAudioSession.Orientation.front
                 })
-                
+
                 try session.setPreferredInput(selectedDesc)
                 try session.setInputDataSource(selectedDataSource)
             } catch let error{
@@ -146,7 +141,7 @@ class RTMPCreator {
             }
         }
     }
-      
+
     private static func switchToHeadset(){
         guard let inputs = session.availableInputs, !inputs.isEmpty else {
             NSLog("RTMPCreator: No available audio inputs for headset switch.")
@@ -163,13 +158,13 @@ class RTMPCreator {
             }
         }
     }
-    
+
     private static func switchToBluetooth(){
         guard let inputs = session.availableInputs, !inputs.isEmpty else {
             NSLog("RTMPCreator: No available audio inputs for bluetooth switch.")
             return
         }
-        
+
         if let selectedDesc = inputs.first(where: { (desc) -> Bool in
             return desc.portType == AVAudioSession.Port.bluetoothHFP
         }){
@@ -180,6 +175,5 @@ class RTMPCreator {
             }
         }
     }
-      
 
 }
